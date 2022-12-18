@@ -1,0 +1,66 @@
+version: '3'
+volumes:
+  php-fpm-socket:
+services:
+  nginx:
+    build:
+      context: .
+      dockerfile: ./docker/nginx/Dockerfile
+    container_name: nginx
+    ports:
+      - 80:80
+    volumes:
+      - ./src/public:/var/www/app/public
+      - ./docker/nginx/conf/nginx.conf:/etc/nginx/nginx.conf
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d
+      - php-fpm-socket:/var/run/php-fpm
+    restart: always
+    depends_on:
+      - php-fpm
+  php-fpm:
+    build:
+      context: .
+      dockerfile: ./docker/php-fpm/Dockerfile
+    container_name: php-fpm
+    environment:
+      APP_KEY: base64:C4uO2yu+aHanqCx0PAtxvAh3Lgov+kV1oOEP0z9FO24=
+      DB_CONNECTION: mysql
+      DB_HOST: db # コンテナのservice名指定
+      DB_PORT: 3306
+      DB_DATABASE: laravel
+      DB_USERNAME: root
+      DB_PASSWORD: secret
+    volumes:
+      - ./php/php-fpm.d/zzz-www.conf:/usr/local/etc/php-fpm.d/zzz-www.conf
+      - ./src:/var/www/app
+      - php-fpm-socket:/var/run/php-fpm
+    depends_on:
+      - db
+  db:
+    build:
+      context: .
+      dockerfile: ./docker/mysql/Dockerfile
+    restart: always
+    container_name: db
+    environment:
+      MYSQL_DATABASE: laravel
+      MYSQL_ROOT_PASSWORD: secret
+      TZ: 'Asia/Tokyo'
+    volumes:
+      - ./data/db/mysql/data:/var/lib/mysql
+      - ./docker/mysql/conf.d/my.cnf:/etc/mysql/conf.d/my.cnf
+    ports:
+      - 3306:3306
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    depends_on:
+      - db
+    environment:
+      - PMA_ARBITRARY=1
+      - PMA_HOSTS=db
+      - PMA_USER=user
+      - PMA_PASSWORD=secret
+    ports:
+      - "3000:80"
+    volumes:
+      - ./data/phpmyadmin/sessions:/sessions
